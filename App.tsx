@@ -1,9 +1,384 @@
-function App() {
-  return (
-    <div>
-      <h1>Hello Sleep Cycle Labs 🚀</h1>
-    </div>
-  )
+
+
+import { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+AlarmClock,
+BarChart3,
+Bell,
+Brain,
+Check,
+ChevronRight,
+Clock3,
+CloudMoon,
+Coffee,
+Crown,
+Droplets,
+Eye,
+Glasses,
+Headphones,
+HeartPulse,
+LineChart,
+Lock,
+Menu,
+Moon,
+Pause,
+Play,
+ShieldCheck,
+ShoppingBag,
+Sparkles,
+Star,
+TimerReset,
+Waves,
+Wind,
+X,
+Zap,
+} from 'lucide-react'
+import './index.css'
+
+type Mode = 'wake' | 'sleep'
+type Quality = 'Good' | 'Better' | 'Best'
+
+type HistoryEntry = {
+bedtime: string
+wake: string
+total: number
+quality: number
 }
 
-export default App
+const cycles = [
+{ count: 4, quality: 'Good' as Quality, note: 'Core rest for busy weekdays' },
+{ count: 5, quality: 'Better' as Quality, note: 'Balanced energy and recovery' },
+{ count: 6, quality: 'Best' as Quality, note: 'Optimal restoration window' },
+]
+
+const navItems = ['Calculator', 'Tracker', 'AI Coach', 'Sounds', 'Blog', 'FAQ']
+
+const qualityTone: Record<Quality, string> = {
+Good: 'from-sky-400 to-cyan-300',
+Better: 'from-violet-400 to-fuchsia-300',
+Best: 'from-amber-200 to-rose-300',
+}
+
+const coachResponses = [
+{
+keys: ['can’t sleep', "can't sleep", 'insomnia', 'fall asleep'],
+title: 'Try a 20-minute wind-down reset',
+tips: [
+'Dim lights and put your phone in focus mode 60 minutes before bed.',
+'Do 4-7-8 breathing for four rounds, then a slow body scan.',
+'If you are awake after 20 minutes, leave bed briefly and read something calm.',
+],
+},
+{
+keys: ['wake up tired', 'waking tired', 'tired', 'groggy'],
+title: 'Wake between cycles and protect deep sleep',
+tips: [
+'Aim for 5–6 full 90-minute cycles and keep wake time consistent.',
+'Avoid alcohol and heavy meals within 3 hours of sleep.',
+'Get bright outdoor light within 30 minutes of waking.',
+],
+},
+{
+keys: ['schedule', 'fix sleep', 'jet lag', 'shift'],
+title: 'Shift your body clock gradually',
+tips: [
+'Move bedtime and wake time by 15–30 minutes every two days.',
+'Use morning light to shift earlier, evening light to shift later.',
+'Keep naps under 20 minutes while adjusting your schedule.',
+],
+},
+]
+
+function addMinutes(time: string, minutes: number) {
+const [hours, mins] = time.split(':').map(Number)
+const date = new Date()
+date.setHours(hours, mins, 0, 0)
+date.setMinutes(date.getMinutes() + minutes)
+return date
+}
+
+function formatTime(date: Date) {
+return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
+
+function minutesBetween(start: string, end: string) {
+const [sh, sm] = start.split(':').map(Number)
+const [eh, em] = end.split(':').map(Number)
+let startM = sh * 60 + sm
+let endM = eh * 60 + em
+if (endM < startM) endM += 24 * 60
+return endM - startM
+}
+
+function App() {
+const [dark, setDark] = useState(true)
+const [mobileOpen, setMobileOpen] = useState(false)
+const [mode, setMode] = useState<Mode>('wake')
+const [targetTime, setTargetTime] = useState('07:00')
+const [napStart, setNapStart] = useState('14:00')
+const [averageSleep, setAverageSleep] = useState(6.25)
+const [desiredSleep, setDesiredSleep] = useState(8)
+const [bedtime, setBedtime] = useState('22:45')
+const [wakeTime, setWakeTime] = useState('06:45')
+const [goal, setGoal] = useState(8)
+const [water, setWater] = useState(5)
+const [coachInput, setCoachInput] = useState('I wake up tired')
+const [soundPlaying, setSoundPlaying] = useState('Rain')
+const [showPremium, setShowPremium] = useState(false)
+const [reminderEnabled, setReminderEnabled] = useState(false)
+const [meditationSeconds, setMeditationSeconds] = useState(300)
+const [authOpen, setAuthOpen] = useState(false)
+
+const sleepResults = useMemo(() => {
+return cycles.map((cycle) => {
+const travel = cycle.count * 90 + 15
+const date = addMinutes(targetTime, mode === 'wake' ? -travel : travel)
+return { ...cycle, time: formatTime(date), minutes: travel }
+})
+}, [mode, targetTime])
+
+const napResults = useMemo(
+() => [
+{ name: 'Power Nap', duration: 20, benefit: 'Fast alertness boost' },
+{ name: 'Recovery Nap', duration: 90, benefit: 'One full sleep cycle' },
+{ name: 'Full Cycle Nap', duration: 110, benefit: 'Includes wind-down buffer' },
+].map((nap) => ({ ...nap, wake: formatTime(addMinutes(napStart, nap.duration)) })),
+[napStart],
+)
+
+const weeklyDebt = Math.max(0, (desiredSleep - averageSleep) * 7)
+const totalSleep = Number((minutesBetween(bedtime, wakeTime) / 60).toFixed(1))
+const quality = Math.min(98, Math.max(45, Math.round((totalSleep / goal) * 88 + (reminderEnabled ? 5 : 0))))
+
+const [history, setHistory] = useState<HistoryEntry[]>([
+{ bedtime: '22:40', wake: '06:35', total: 7.9, quality: 88 },
+{ bedtime: '23:10', wake: '06:50', total: 7.7, quality: 84 },
+{ bedtime: '22:30', wake: '06:45', total: 8.2, quality: 93 },
+{ bedtime: '23:00', wake: '07:00', total: 8, quality: 91 },
+])
+
+const average = Number((history.reduce((sum, item) => sum + item.total, 0) / history.length).toFixed(1))
+const streak = history.filter((item) => item.total >= goal - 0.4).length
+const maxBar = Math.max(...history.map((item) => item.total), goal)
+
+const coach = useMemo(() => {
+const input = coachInput.toLowerCase()
+return coachResponses.find((response) => response.keys.some((key) => input.includes(key))) ?? {
+title: 'Build a calmer sleep system',
+tips: [
+'Keep a stable sleep/wake time, including weekends, within a 60-minute range.',
+'Reserve your bed for sleep and intimacy so your brain links bed with rest.',
+'Use this calculator to choose a wake time that ends near a 90-minute cycle.',
+],
+}
+}, [coachInput])
+
+function saveSleepEntry() {
+setHistory((current) => [
+...current.slice(-5),
+{ bedtime, wake: wakeTime, total: totalSleep, quality },
+])
+}
+
+function startReminder() {
+setReminderEnabled(true)
+if ('Notification' in window && Notification.permission === 'default') {
+Notification.requestPermission().catch(() => undefined)
+}
+}
+
+const appTheme = dark ? 'dark' : 'light'
+
+return (
+<div className={appTheme}>
+<div className="min-h-screen overflow-hidden bg-slate-50 text-slate-950 transition-colors duration-500 dark:bg-[#030712] dark:text-white">
+<div className="pointer-events-none fixed inset-0 overflow-hidden">
+<div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-violet-600/25 blur-3xl" />
+<div className="absolute right-[-160px] top-60 h-[420px] w-[420px] rounded-full bg-cyan-500/15 blur-3xl" />
+<div className="absolute bottom-0 left-[-120px] h-[420px] w-[420px] rounded-full bg-indigo-700/20 blur-3xl" />
+{Array.from({ length: 22 }).map((_, index) => (
+<span
+key={index}
+className="absolute h-1 w-1 rounded-full bg-white/60 shadow-[0_0_16px_rgba(255,255,255,.9)]"
+style={{ top: ${(index * 37) % 90}%, left: ${(index * 53) % 96}%, opacity: index % 3 === 0 ? 0.9 : 0.35 }}
+/>
+))}
+</div>
+
+<header className="sticky top-0 z-50 border-b border-white/10 bg-white/70 backdrop-blur-2xl dark:bg-slate-950/55">  
+      <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">  
+        <a href="#top" className="flex items-center gap-3" aria-label="Sleep Cycle Labs home">  
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-cyan-300 shadow-lg shadow-violet-500/25">  
+            <CloudMoon className="h-6 w-6 text-white" />  
+          </span>  
+          <span>  
+            <span className="block text-lg font-semibold tracking-tight">Sleep Cycle Labs</span>  
+            <span className="text-xs text-slate-500 dark:text-slate-400">AI sleep optimization</span>  
+          </span>  
+        </a>  
+        <div className="hidden items-center gap-1 lg:flex">  
+          {navItems.map((item) => (  
+            <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="rounded-full px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-900/5 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white">  
+              {item}  
+            </a>  
+          ))}  
+        </div>  
+        <div className="hidden items-center gap-3 sm:flex">  
+          <button onClick={() => setDark((value) => !value)} className="rounded-full border border-slate-300/50 bg-white/60 px-4 py-2 text-sm font-medium shadow-sm transition hover:scale-105 dark:border-white/10 dark:bg-white/10">  
+            {dark ? 'Light' : 'Dark'} mode  
+          </button>  
+          <button onClick={() => setAuthOpen(true)} className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-950 shadow-xl shadow-indigo-950/10 transition hover:scale-105 dark:bg-white dark:text-slate-950">  
+            Login / Sign up  
+          </button>  
+        </div>  
+        <button onClick={() => setMobileOpen((value) => !value)} className="rounded-2xl border border-white/10 p-3 lg:hidden" aria-label="Open menu">  
+          {mobileOpen ? <X /> : <Menu />}  
+        </button>  
+      </nav>  
+      <AnimatePresence>  
+        {mobileOpen && (  
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="border-t border-white/10 px-4 py-4 lg:hidden">  
+            {navItems.map((item) => (  
+              <a onClick={() => setMobileOpen(false)} key={item} href={`#${item.toLowerCase().replace(' ', '-')}`} className="block rounded-2xl px-4 py-3 text-slate-700 dark:text-slate-200">  
+                {item}  
+              </a>  
+            ))}  
+          </motion.div>  
+        )}  
+      </AnimatePresence>  
+    </header>  
+
+    <main id="top" className="relative z-10">  
+      <section className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-16 pt-16 sm:px-6 lg:grid-cols-[1.05fr_.95fr] lg:px-8 lg:pb-24 lg:pt-24">  
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>  
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-400/10 px-4 py-2 text-sm text-violet-700 dark:text-violet-200">  
+            <Sparkles className="h-4 w-4" /> Built for USA, UK, Canada & Australia sleep routines  
+          </div>  
+          <h1 className="max-w-4xl text-5xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-6xl lg:text-7xl">  
+            Wake up refreshed with AI-powered sleep cycles.  
+          </h1>  
+          <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">  
+            Sleep Cycle Labs calculates your perfect bedtime or wake-up time using 90-minute cycles, nap science, sleep debt recovery, smart reminders, and an AI sleep coach.  
+          </p>  
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">  
+            <a href="#calculator" className="group inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-400 px-7 py-4 font-semibold text-white shadow-2xl shadow-violet-500/25 transition hover:scale-[1.03]">  
+              Calculate Your Perfect Sleep Time <ChevronRight className="ml-2 h-5 w-5 transition group-hover:translate-x-1" />  
+            </a>  
+            <button onClick={() => setShowPremium(true)} className="inline-flex items-center justify-center rounded-full border border-slate-300/60 bg-white/60 px-7 py-4 font-semibold text-slate-900 backdrop-blur transition hover:scale-[1.03] dark:border-white/10 dark:bg-white/10 dark:text-white">  
+              <Crown className="mr-2 h-5 w-5 text-amber-300" /> Try Premium  
+            </button>  
+          </div>  
+          <div className="mt-10 grid grid-cols-3 gap-3 sm:max-w-xl">  
+            {['90-min cycles', 'AI coaching', 'AdSense ready'].map((item) => (  
+              <div key={item} className="rounded-3xl border border-slate-200 bg-white/60 p-4 text-center shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5">  
+                <Check className="mx-auto mb-2 h-5 w-5 text-cyan-300" />  
+                <p className="text-sm text-slate-600 dark:text-slate-300">{item}</p>  
+              </div>  
+            ))}  
+          </div>  
+        </motion.div>  
+
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8 }} className="relative">  
+          <div className="absolute -inset-6 rounded-[3rem] bg-gradient-to-br from-violet-500/20 to-cyan-500/10 blur-2xl" />  
+          <div className="relative rounded-[2rem] border border-white/15 bg-white/70 p-5 shadow-2xl backdrop-blur-2xl dark:bg-white/[0.07]">  
+            <div className="flex items-center justify-between rounded-3xl bg-slate-950 p-5 text-white dark:bg-black/40">  
+              <div>  
+                <p className="text-sm text-slate-400">Tonight's best plan</p>  
+                <p className="mt-1 text-3xl font-semibold">10:15 PM</p>  
+              </div>  
+              <div className="grid h-20 w-20 place-items-center rounded-full bg-gradient-to-br from-indigo-500 to-cyan-300 shadow-lg shadow-cyan-500/20">  
+                <Moon className="h-10 w-10" />  
+              </div>  
+            </div>  
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">  
+              <StatCard icon={<Clock3 />} label="Cycles" value="6" detail="Best quality" />  
+              <StatCard icon={<HeartPulse />} label="Readiness" value="94%" detail="Recovery score" />  
+            </div>  
+            <div className="mt-5 rounded-3xl border border-white/10 bg-slate-950/90 p-5 text-white">  
+              <div className="mb-4 flex items-center justify-between">  
+                <p className="font-medium">Sleep quality trend</p>  
+                <LineChart className="h-5 w-5 text-cyan-300" />  
+              </div>  
+              <div className="flex h-36 items-end gap-3">  
+                {[58, 72, 66, 84, 79, 91, 96].map((height, index) => (  
+                  <motion.div key={index} initial={{ height: 0 }} animate={{ height: `${height}%` }} transition={{ delay: index * 0.08 }} className="flex-1 rounded-t-2xl bg-gradient-to-t from-indigo-600 to-cyan-300" />  
+                ))}  
+              </div>  
+            </div>  
+          </div>  
+        </motion.div>  
+      </section>  
+
+      <AdBanner label="AdSense placement: responsive top wellness sponsor" />  
+
+      <section id="calculator" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">  
+        <SectionHeader eyebrow="Sleep cycle calculator" title="Find your ideal sleep or wake time" text="Choose whether you want to wake up refreshed or go to sleep now. We include a 15-minute falling-asleep buffer and 90-minute cycles." />  
+        <div className="grid gap-6 lg:grid-cols-[.9fr_1.1fr]">  
+          <GlassCard>  
+            <div className="grid grid-cols-2 rounded-2xl bg-slate-900/5 p-1 dark:bg-black/30">  
+              {(['wake', 'sleep'] as Mode[]).map((item) => (  
+                <button key={item} onClick={() => setMode(item)} className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${mode === item ? 'bg-white text-slate-950 shadow-lg dark:bg-white' : 'text-slate-500 dark:text-slate-300'}`}>  
+                  I want to {item === 'wake' ? 'wake up at' : 'go to sleep at'}  
+                </button>  
+              ))}  
+            </div>  
+            <label className="mt-6 block text-sm font-medium text-slate-600 dark:text-slate-300">Target time</label>  
+            <input type="time" value={targetTime} onChange={(event) => setTargetTime(event.target.value)} className="mt-2 w-full rounded-3xl border border-slate-200 bg-white/70 px-5 py-4 text-2xl font-semibold outline-none ring-cyan-300/30 transition focus:ring-4 dark:border-white/10 dark:bg-black/30" />  
+            <p className="mt-5 rounded-3xl bg-cyan-400/10 p-4 text-sm text-slate-600 dark:text-slate-300">  
+              Tip: six cycles works best for most adults, but five cycles can be realistic for high-demand mornings.  
+            </p>  
+          </GlassCard>  
+          <div className="grid gap-4 md:grid-cols-3">  
+            {sleepResults.map((result) => (  
+              <motion.div whileHover={{ y: -8 }} key={result.count} className="rounded-[2rem] border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-indigo-950/20">  
+                <div className={`mb-5 inline-flex rounded-full bg-gradient-to-r ${qualityTone[result.quality]} px-3 py-1 text-xs font-bold text-slate-950`}>{result.quality}</div>  
+                <p className="text-sm text-slate-400">{mode === 'wake' ? 'Go to sleep at' : 'Wake up at'}</p>  
+                <p className="mt-2 text-4xl font-semibold">{result.time}</p>  
+                <div className="mt-6 border-t border-white/10 pt-5">  
+                  <p className="font-medium">{result.count} cycles</p>  
+                  <p className="mt-1 text-sm text-slate-400">{result.note}</p>  
+                </div>  
+              </motion.div>  
+            ))}  
+          </div>  
+        </div>  
+      </section>  
+
+      <section className="mx-auto grid max-w-7xl gap-6 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:px-8">  
+        <GlassCard>  
+          <div className="flex items-center gap-3"><Coffee className="text-amber-300" /><h2 className="text-2xl font-semibold">Nap Calculator</h2></div>  
+          <label className="mt-6 block text-sm text-slate-500 dark:text-slate-400">Nap start time</label>  
+          <input type="time" value={napStart} onChange={(event) => setNapStart(event.target.value)} className="mt-2 w-full rounded-3xl border border-slate-200 bg-white/70 px-5 py-4 text-xl font-semibold outline-none dark:border-white/10 dark:bg-black/30" />  
+          <div className="mt-5 grid gap-3">  
+            {napResults.map((nap) => (  
+              <div key={nap.name} className="flex items-center justify-between rounded-3xl bg-slate-900/5 p-4 dark:bg-white/5">  
+                <div><p className="font-semibold">{nap.name}</p><p className="text-sm text-slate-500 dark:text-slate-400">{nap.duration} min • {nap.benefit}</p></div>  
+                <p className="text-xl font-semibold text-cyan-500 dark:text-cyan-300">{nap.wake}</p>  
+              </div>  
+            ))}  
+          </div>  
+        </GlassCard>  
+        <GlassCard>  
+          <div className="flex items-center gap-3"><TimerReset className="text-rose-300" /><h2 className="text-2xl font-semibold">Sleep Debt Calculator</h2></div>  
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">  
+            <NumberInput label="Average daily sleep" value={averageSleep} setValue={setAverageSleep} suffix="hrs" />  
+            <NumberInput label="Desired sleep" value={desiredSleep} setValue={setDesiredSleep} suffix="hrs" />  
+          </div>  
+          <div className="mt-6 rounded-[2rem] bg-gradient-to-br from-violet-500/20 to-cyan-500/10 p-6">  
+            <p className="text-sm text-slate-500 dark:text-slate-300">Weekly sleep debt</p>  
+            <p className="mt-1 text-5xl font-semibold">{weeklyDebt.toFixed(1)}h</p>  
+            <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">Recover gently: add 30–45 minutes for several nights, keep naps early, hydrate, and protect a consistent wake time.</p>  
+          </div>  
+        </GlassCard>  
+      </section>  
+
+      <section id="tracker" className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">  
+        <SectionHeader eyebrow="Sleep tracker dashboard" title="Save history, goals, and weekly analytics" text="A premium dashboard preview for daily sleep goals, streaks, hydration reminders, and quality tracking." />  
+        <div className="grid gap-6 lg:grid-cols-[.8fr_1.2fr]">  
+          <GlassCard>  
+            <div className="grid gap-4 sm:grid-cols-2">  
+              <TimeField label="Bedtime" value={bedtime} onChange={setBedtime} />  
+              <TimeField label="Wake-up" value={wakeTime} onChange={setWakeTime} />  
+              <NumberInput label="Daily sleep goal" value={goal} setValue={setGoal} suffix="hrs" />  
+              <NumberInput label="Water cups" value={water} setVa
